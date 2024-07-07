@@ -18,22 +18,29 @@ def prepare_data(grid_size, Re, device, percentage):
     x_flat = X.flatten()
     y_flat = Y.flatten()
     u, v, p = Kovasznay(X, Y, Re)  # Ensure this function returns numpy arrays
-    u, v, p = u.flatten(), v.flatten(), p.flatten()
-    # Select a subset of data based on the percentage
-    total_samples = x_flat.shape[0]
-    num_samples = int(total_samples * percentage)
-    indices = np.random.choice(total_samples, num_samples, replace=False)
+    u_flat, v_flat, p_flat = u.flatten(), v.flatten(), p.flatten()
 
-    # Convert selected data to tensors and move to the specified device
-    x_selected = x_flat[indices]
-    y_selected = y_flat[indices]
-    x_selected = torch.tensor(x_selected, dtype=torch.float32, requires_grad=True).to(device)
-    y_selected = torch.tensor(y_selected, dtype=torch.float32, requires_grad=True).to(device)
-    u_selected = torch.tensor(u.flatten()[indices], dtype=torch.float32, requires_grad=True).to(device)
-    v_selected = torch.tensor(v.flatten()[indices], dtype=torch.float32, requires_grad=True).to(device)
-    p_selected = torch.tensor(p.flatten()[indices], dtype=torch.float32, requires_grad=True).to(device)
+    if percentage < 1.0:
+        # Select a subset of data based on the percentage
+        total_samples = x_flat.shape[0]
+        num_samples = int(total_samples * percentage)
+        indices = np.random.choice(total_samples, num_samples, replace=False)
+
+        # Convert selected data to tensors and move to the specified device
+        x_selected = torch.tensor(x_flat[indices], dtype=torch.float32, requires_grad=True).to(device)
+        y_selected = torch.tensor(y_flat[indices], dtype=torch.float32, requires_grad=True).to(device)
+        u_selected = torch.tensor(u_flat[indices], dtype=torch.float32, requires_grad=True).to(device)
+        v_selected = torch.tensor(v_flat[indices], dtype=torch.float32, requires_grad=True).to(device)
+        p_selected = torch.tensor(p_flat[indices], dtype=torch.float32, requires_grad=True).to(device)
+    else:
+        # Use the entire dataset without subsampling
+        x_selected = torch.tensor(x_flat, dtype=torch.float32, requires_grad=True).to(device)
+        y_selected = torch.tensor(y_flat, dtype=torch.float32, requires_grad=True).to(device)
+        u_selected = torch.tensor(u_flat, dtype=torch.float32, requires_grad=True).to(device)
+        v_selected = torch.tensor(v_flat, dtype=torch.float32, requires_grad=True).to(device)
+        p_selected = torch.tensor(p_flat, dtype=torch.float32, requires_grad=True).to(device)
+
     return x_selected, y_selected, u_selected, v_selected, p_selected
-
 def plot_uvp(x, y, u_out, v_out, p_out, u_true, v_true, p_true, filename):
     # Detach, move to CPU and convert to numpy arrays
     #x = x.detach().cpu().numpy()

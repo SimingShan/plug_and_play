@@ -6,7 +6,8 @@ import torch
 import os
 def main():
     # Store configuration settings here
-    device = 'mps' if torch.backends.mps.is_built() else 'cpu'  # Ensure compatibility with available devices
+    device = 'mps' if torch.backends.mps.is_built() else 'cuda'  # Ensure compatibility with available devices
+    print(f"Model training on {device}")
     grid_size = 100
     Re = 20
     num_epochs = 30000
@@ -24,8 +25,8 @@ def main():
     # Save model checkpoint
     checkpoint_dir = 'checkpoint'
     os.makedirs(checkpoint_dir, exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(checkpoint_dir, 'model_checkpoint.pth'))
-    print(f"Model parameters saved to {os.path.join(checkpoint_dir, 'model_checkpoint.pth')}")
+    torch.save(model.state_dict(), os.path.join(checkpoint_dir, f'model_checkpoint_Reynolds{Re}.pth'))
+    print(f"Model parameters saved to {os.path.join(checkpoint_dir, f'model_checkpoint_Reynolds{Re}.pth')}")
 
     model.eval()
     model_testing(model, grid_size, Re, device)
