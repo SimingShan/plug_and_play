@@ -63,6 +63,9 @@ class NavierStokes():
         g = u * v_x + v * v_y + p_y - 1 / self.re * (v_xx + v_yy)
 
         continuity = u_x + v_y
+        print(f'u shape is {u.shape}')
+        print(f'f shape is {f.shape}')
+        print(f'con shape is {continuity.shape}')
         return u, v, p, f, g, continuity
 
     def closure(self):
@@ -77,10 +80,16 @@ class NavierStokes():
         f_loss = self.mse(f_prediction, self.null)
         g_loss = self.mse(g_prediction, self.null)
         continuity_loss = self.mse(continuity_prediction, self.null)
+        print(f'u loss {u_loss}')
+        print(f'v loss {v_loss}')
+        print(f'p loss {p_loss}')
+        print(f'f loss {f_loss}')
+        print(f'g loss {g_loss}')
+        print(f'con loss {continuity_loss}')
         total_loss = u_loss + v_loss + f_loss + g_loss + p_loss + continuity_loss
         total_loss.backward()
         self.iter += 1
-        if self.iter % 1000 == 0:
+        if self.iter % 100 == 0:
             print('Iteration: {:}, Loss: {:0.10f}'.format(self.iter, total_loss.item()))
         return total_loss
 
@@ -116,6 +125,7 @@ class NavierStokes():
 x = np.linspace(0, 1.0, 100)
 y = np.linspace(0, 1.0, 100)
 X, Y = np.meshgrid(x, y)
+
 x_flat = X.flatten()
 y_flat = Y.flatten()
 Re = 20
@@ -135,8 +145,8 @@ p_train = p[indices]
 
 # Use reduced dataset for training
 pinn = NavierStokes(x_flat_train, y_flat_train, p_train, u_train, v_train, Re)
-#pinn.train_adam()
-#pinn.train_lbfgs()
+pinn.train_adam()
+pinn.train_lbfgs()
 #torch.save(pinn.net.state_dict(), 'model.pt')
 pinn.net.load_state_dict(torch.load('model.pt', map_location=device))
 pinn.net.eval()
