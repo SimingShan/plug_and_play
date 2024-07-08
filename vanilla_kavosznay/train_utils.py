@@ -20,7 +20,6 @@ def ns_pde_loss(x, y, u, v, p, re):
     p_y = torch.autograd.grad(p, y, grad_outputs=torch.ones_like(p), create_graph=True)[0]
 
     # Navier-Stokes equations and continuity equation
-
     f = u * u_x + v * u_y + p_x - 1 / re * (u_xx + u_yy)
     g = u * v_x + v * v_y + p_y - 1 / re * (v_xx + v_yy)
 
@@ -63,52 +62,73 @@ def log_gradients(model):
             print(f'{name}: grad_mean={grad_mean:.6e}, grad_std={grad_std:.6e}')
 
 
-def train(model, x, y, u_target, v_target, p_target, re, num_epochs, initial_lr):
-    optimizer = optim.Adam(model.parameters(), lr=initial_lr)
-    optimizer_lbfgs = optim.LBFGS(model.parameters(), max_iter=50000, tolerance_grad=1e-9, tolerance_change=1e-9,
-                                  history_size=100)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=1000,
-                                                     min_lr=1e-7)
+def train(model, x, y, u_target, v_target, p_target, re, num_epochs, initial_lr, lora=None):
+    if lora is None:
+        optimizer = optim.Adam(model.parameters(), lr=initial_lr)
+        optimizer_lbfgs = optim.LBFGS(model.parameters(), max_iter=50000, tolerance_grad=1e-9, tolerance_change=1e-9,
+                                      history_size=100)
+        print("Training the base model")
+    else:
+
+        optimizer = optim.Adam(lora.parameters(), lr=initial_lr)
+        optimizer_lbfgs = optim.LBFGS(lora.parameters(), max_iter=50000, tolerance_grad=1e-9, tolerance_change=1e-9,
+                                      history_size=100)
+        print("Training the LoRA model")
+
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=1000, min_lr=1e-7)
     model.train()
     best_loss = float('inf')
     best_iter = 0
 
+    # Time tracking for various components
+    forward_time = 0
+    backward_time = 0
+    update_time = 0
+
     for epoch in range(num_epochs):
-        start_time = time.time()
-
+        # Forward pass
         optimizer.zero_grad()
+        forward_start = time.time()
         u_pred, v_pred, p_pred, f_pred, g_pred, continuity_pred = forward(model, x, y, re)
-        u_loss, v_loss, p_loss, f_loss, g_loss, continuity_loss = compute_loss(u_pred,
-                                                                               v_pred, p_pred, f_pred, g_pred,
-                                                                               continuity_pred, u_target, v_target,
-                                                                               p_target)
+        forward_time = time.time() - forward_start
+
+        # Loss calculation
+        u_loss, v_loss, p_loss, f_loss, g_loss, continuity_loss = compute_loss(u_pred, v_pred, p_pred, f_pred, g_pred, continuity_pred, u_target, v_target, p_target)
         loss = u_loss + v_loss + p_loss + f_loss + g_loss + continuity_loss
+        backward_start = time.time()
         loss.backward()
+        backward_time = time.time() - backward_start
+        # Optimizer step
+        update_start = time.time()
         optimizer.step()
+        update_time = time.time() - update_start
 
-        end_time = time.time()
-        epoch_time = end_time - start_time
-
-        if epoch >= 1000:
-            scheduler.step(loss)
+        scheduler.step(loss)
 
         if loss.item() < best_loss:
             best_loss = loss.item()
             best_iter = epoch
 
-        if epoch - best_iter > 1000:
+        if (epoch + 1) % 100 == 0 or epoch == num_epochs - 1:
+            current_lr = scheduler.optimizer.param_groups[0]['lr']
+            print(
+                f"Epoch: {epoch + 1}, Loss: {loss.item():.10f}, Current LR: {current_lr:.1e}, "
+                f"Forward Time: {forward_time:.4f}s, Backward Time: {backward_time:.4f}s, Update Time: {update_time:.4f}s"
+            )
+
+        if epoch - best_iter > 5000:
             print(f"Early stopping at epoch {epoch} with best loss {best_loss:.10f}")
             break
 
-        if (epoch + 1) % 1000 == 0:
-            current_lr = scheduler.optimizer.param_groups[0]['lr']
-            print(
-                f"Epoch: {epoch + 1}, Loss: {loss.item():.10f}, Current LR: {current_lr:.1e}, Training time for epoch: {epoch_time:.2f} seconds")
-
+    # Total times
+    print(f"Total Forward Time: {forward_time:.2f}s, Total Backward Time: {backward_time:.2f}s, Total Update Time: {update_time:.2f}s")
     def closure():
         optimizer_lbfgs.zero_grad()
-        u_loss, v_loss, p_loss, f_loss, g_loss, continuity_loss = compute_loss(model, x, y, u_target, v_target,
-                                                                               p_target, re)
+        u_pred, v_pred, p_pred, f_pred, g_pred, continuity_pred = forward(model, x, y, re)
+        u_loss, v_loss, p_loss, f_loss, g_loss, continuity_loss = compute_loss(u_pred,
+                                                                               v_pred, p_pred, f_pred, g_pred,
+                                                                               continuity_pred, u_target, v_target,
+                                                                               p_target)
         loss = u_loss + v_loss + p_loss + f_loss + g_loss + continuity_loss
         loss.backward()
         return loss

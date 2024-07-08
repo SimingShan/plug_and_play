@@ -4,8 +4,7 @@ from train_utils import forward
 import torch
 
 # Load the checkpoint
-#device = 'mps' if torch.backends.mps.is_built() else 'cuda'
-device = 'mps'
+device = 'mps' if torch.backends.mps.is_built() else 'cuda'
 model = MLP_NS()
 model.load_state_dict(torch.load("./checkpoint/model_checkpoint.pth", map_location=device))
 # Move the model to the appropriate device

@@ -8,16 +8,16 @@ def main():
     # Store configuration settings here
     device = 'mps' if torch.backends.mps.is_built() else 'cuda'  # Ensure compatibility with available devices
     print(f"Model training on {device}")
-    grid_size = 100
+    grid_size = 200
     Re = 20
     num_epochs = 30000
     initial_lr = 1e-3
 
     # Prepare data
-    x, y, u, v, p = prepare_data(grid_size, Re, device, 0.1)
+    x, y, u, v, p = prepare_data(grid_size, Re, device, 0.8)
 
     # Initialize model
-    model = MLP_NS().to(device)
+    model = MLP_NS(2, 64, 3).to(device)
 
     # Train model
     train(model, x, y, u, v, p, Re, num_epochs, initial_lr)
